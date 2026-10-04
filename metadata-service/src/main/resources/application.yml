@@ -1,0 +1,23 @@
+server.port: ${SERVER_PORT:8081}
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nexusdrive}
+    username: ${DB_USER:nexusdrive}
+    password: ${DB_PASSWORD:nexusdrive}
+  jpa:
+    hibernate.ddl-auto: validate
+    open-in-view: false
+  flyway:
+    table: flyway_schema_history_metadata
+    baseline-on-migrate: true
+    baseline-version: 1
+  servlet.multipart.max-file-size: 2GB
+  servlet.multipart.max-request-size: 2GB
+jwt:
+  secret: ${JWT_SECRET:change-this-development-secret-32-bytes-minimum}
+storage.nodes: ${STORAGE_NODES:localhost:9001,localhost:9002,localhost:9003}
+storage.internal-secret: ${STORAGE_INTERNAL_SECRET:change-this-storage-internal-secret}
+storage.replication-factor: ${REPLICATION_FACTOR:3}
+encryption.master-key: ${ENCRYPTION_MASTER_KEY:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=}
+management.endpoints.web.exposure.include: health,info
+springdoc.swagger-ui.path: /swagger-ui.html

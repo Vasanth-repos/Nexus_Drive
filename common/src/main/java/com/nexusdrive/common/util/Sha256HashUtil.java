@@ -1,0 +1,1 @@
+package com.nexusdrive.common.util; import java.security.*; import java.util.HexFormat; public final class Sha256HashUtil {private Sha256HashUtil(){} public static String hash(byte[] data){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}}

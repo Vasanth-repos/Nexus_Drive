@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.service;import java.util.List;public interface ChunkOrchestrationService{String primary(String chunkId);List<String> replicas(String primary);void put(String node,String chunkId,byte[] bytes);byte[] get(String node,String chunkId);byte[] getWithFailover(String primary,String[] replicas,String chunkId);void delete(String node,String chunkId);}

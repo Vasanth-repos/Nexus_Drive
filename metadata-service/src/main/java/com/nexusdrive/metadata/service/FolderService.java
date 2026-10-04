@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.service;import com.nexusdrive.metadata.dto.*;import com.nexusdrive.metadata.entity.Folder;import java.util.UUID;public interface FolderService{Folder create(UUID owner,FolderRequest r);Folder update(UUID owner,UUID id,FolderRequest r);void delete(UUID owner,UUID id);FolderContentsResponse contents(UUID owner,UUID id);}

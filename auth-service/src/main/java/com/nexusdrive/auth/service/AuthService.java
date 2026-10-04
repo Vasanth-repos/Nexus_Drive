@@ -1,0 +1,1 @@
+package com.nexusdrive.auth.service; import com.nexusdrive.auth.dto.*; public interface AuthService {AuthResponse register(RegisterRequest r);AuthResponse login(LoginRequest r);AuthResponse refresh(String token);void revoke(String token);}

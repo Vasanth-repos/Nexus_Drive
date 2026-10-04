@@ -1,0 +1,1 @@
+package com.nexusdrive.common.util; import static org.junit.jupiter.api.Assertions.*; import java.util.List; import org.junit.jupiter.api.Test; class ConsistentHashingUtilTest {@Test void stableAndKnownNode(){var h=new ConsistentHashingUtil(List.of("a","b","c"));assertEquals(h.getNode("chunk"),h.getNode("chunk"));assertTrue(List.of("a","b","c").contains(h.getNode("other")));}}

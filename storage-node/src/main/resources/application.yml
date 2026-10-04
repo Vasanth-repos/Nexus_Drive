@@ -1,0 +1,9 @@
+server.port: ${SERVER_PORT:9001}
+storage:
+  path: ${STORAGE_PATH:./data}
+  node-id: ${NODE_ID:node-1}
+  peers: ${PEERS:}
+  replication-factor: ${REPLICATION_FACTOR:3}
+  internal-secret: ${STORAGE_INTERNAL_SECRET:change-this-storage-internal-secret}
+management.endpoints.web.exposure.include: health,info
+springdoc.swagger-ui.path: /swagger-ui.html

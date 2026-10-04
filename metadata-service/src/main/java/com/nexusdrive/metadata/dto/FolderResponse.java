@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.dto;import com.nexusdrive.metadata.entity.Folder;import java.util.UUID;public record FolderResponse(UUID id,String name,String fullPath,UUID parentId){public static FolderResponse from(Folder f){return new FolderResponse(f.getId(),f.getName(),f.getFullPath(),f.getParent()==null?null:f.getParent().getId());}}

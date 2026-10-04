@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: nexusdrive-postgres
+    environment: {POSTGRES_DB: nexusdrive, POSTGRES_USER: "${DB_USER}", POSTGRES_PASSWORD: "${DB_PASSWORD}"}
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d nexusdrive"], interval: 5s, timeout: 3s, retries: 20}
+  auth-service:
+    build: {context: ., dockerfile: auth-service/Dockerfile}
+    container_name: nexusdrive-auth
+    ports: ["8080:8080"]
+    environment: {JWT_SECRET: "${JWT_SECRET}", DB_URL: "jdbc:postgresql://postgres:5432/nexusdrive", DB_USER: "${DB_USER}", DB_PASSWORD: "${DB_PASSWORD}"}
+    depends_on: {postgres: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"], interval: 10s, timeout: 5s, retries: 20}
+  metadata-service:
+    build: {context: ., dockerfile: metadata-service/Dockerfile}
+    container_name: nexusdrive-metadata
+    ports: ["8081:8081"]
+    environment: {JWT_SECRET: "${JWT_SECRET}", DB_URL: "jdbc:postgresql://postgres:5432/nexusdrive", DB_USER: "${DB_USER}", DB_PASSWORD: "${DB_PASSWORD}", STORAGE_NODES: "storage-node-1:9001,storage-node-2:9002,storage-node-3:9003", STORAGE_INTERNAL_SECRET: "${STORAGE_INTERNAL_SECRET}", ENCRYPTION_MASTER_KEY: "${ENCRYPTION_MASTER_KEY}"}
+    depends_on: {auth-service: {condition: service_healthy}, storage-node-1: {condition: service_healthy}, storage-node-2: {condition: service_healthy}, storage-node-3: {condition: service_healthy}}
+    healthcheck: {test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"], interval: 10s, timeout: 5s, retries: 20}
+  storage-node-1:
+    build: {context: ., dockerfile: storage-node/Dockerfile}
+    container_name: nexusdrive-storage-1
+    ports: ["9001:9001"]
+    environment: {SERVER_PORT: 9001, NODE_ID: node-1, STORAGE_PATH: /data, PEERS: "storage-node-2:9002,storage-node-3:9003", REPLICATION_FACTOR: 3, STORAGE_INTERNAL_SECRET: "${STORAGE_INTERNAL_SECRET}"}
+    volumes: ["storage1:/data"]
+    healthcheck: {test: ["CMD", "wget", "-q", "--spider", "http://localhost:9001/actuator/health"], interval: 10s, timeout: 5s, retries: 20}
+  storage-node-2:
+    build: {context: ., dockerfile: storage-node/Dockerfile}
+    container_name: nexusdrive-storage-2
+    ports: ["9002:9002"]
+    environment: {SERVER_PORT: 9002, NODE_ID: node-2, STORAGE_PATH: /data, PEERS: "storage-node-1:9001,storage-node-3:9003", REPLICATION_FACTOR: 3, STORAGE_INTERNAL_SECRET: "${STORAGE_INTERNAL_SECRET}"}
+    volumes: ["storage2:/data"]
+    healthcheck: {test: ["CMD", "wget", "-q", "--spider", "http://localhost:9002/actuator/health"], interval: 10s, timeout: 5s, retries: 20}
+  storage-node-3:
+    build: {context: ., dockerfile: storage-node/Dockerfile}
+    container_name: nexusdrive-storage-3
+    ports: ["9003:9003"]
+    environment: {SERVER_PORT: 9003, NODE_ID: node-3, STORAGE_PATH: /data, PEERS: "storage-node-1:9001,storage-node-2:9002", REPLICATION_FACTOR: 3, STORAGE_INTERNAL_SECRET: "${STORAGE_INTERNAL_SECRET}"}
+    volumes: ["storage3:/data"]
+    healthcheck: {test: ["CMD", "wget", "-q", "--spider", "http://localhost:9003/actuator/health"], interval: 10s, timeout: 5s, retries: 20}
+volumes: {pgdata: {}, storage1: {}, storage2: {}, storage3: {}}

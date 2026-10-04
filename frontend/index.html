@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusDrive - Distributed Cloud Storage & Directory Explorer</title>
+  <meta name="description" content="NexusDrive distributed cloud storage directory specification, folder hierarchy, 8 MiB chunking, and 3-node replication." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body class="dark-theme">
+  <!-- Global Drag-and-Drop Overlay -->
+  <div id="drag-drop-overlay" class="drag-drop-overlay hidden">
+    <div class="drop-zone-card">
+      <div class="pulse-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <h2>Drop files here to upload</h2>
+      <p id="drop-target-folder-text">Files will be placed in the current directory, chunked into 8 MiB blocks, and replicated 3x</p>
+    </div>
+  </div>
+
+  <div id="app" class="app-layout">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logo-grad)" stroke-width="2.2">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="100%" stop-color="#06b6d4" />
+              </linearGradient>
+            </defs>
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Nexus<span class="gradient-text">Drive</span></span>
+          <span class="brand-badge">Directory Spec</span>
+        </div>
+      </div>
+
+      <div class="header-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="search-input" placeholder="Search directory files, extensions, tags..." autocomplete="off" />
+        <button id="clear-search-btn" class="clear-btn hidden" title="Clear search">&times;</button>
+      </div>
+
+      <div class="header-cluster-status" id="btn-toggle-cluster-drawer" title="Click to view Live Storage Cluster Nodes">
+        <div class="cluster-pill clickable-pill">
+          <span class="status-indicator live" id="cluster-indicator"></span>
+          <span class="cluster-label">Cluster:</span>
+          <span class="node-badge" id="node1-badge" title="Node 1 (Port 9001)">N1</span>
+          <span class="node-badge" id="node2-badge" title="Node 2 (Port 9002)">N2</span>
+          <span class="node-badge" id="node3-badge" title="Node 3 (Port 9003)">N3</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 2px;">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <div class="header-user-actions" id="user-controls"></div>
+    </header>
+
+    <div class="app-body">
+      <!-- Sidebar: Directory Tree & Directory Specification -->
+      <aside class="app-sidebar">
+        <div class="sidebar-upload-action">
+          <button id="btn-open-upload" class="btn btn-primary btn-upload">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Upload File</span>
+          </button>
+          <input type="file" id="file-input-hidden" style="display: none;" multiple />
+        </div>
+
+        <!-- Directory Spec & Tree Navigation -->
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span class="sidebar-section-title">Directory Tree</span>
+            <button id="btn-sidebar-new-folder" class="btn-icon-xs" title="Create folder here">+</button>
+          </div>
+          <div class="directory-tree" id="directory-tree">
+            <div class="tree-item active" data-folder-id="" id="tree-root">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              </svg>
+              <span class="tree-label">Root ( / )</span>
+            </div>
+            <div id="tree-subfolders" class="tree-children">
+              <!-- Dynamically populated subdirectories -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Directory Specification Details Card -->
+        <div class="sidebar-spec-card">
+          <div class="spec-header">
+            <span class="spec-title">Directory Spec</span>
+            <span class="badge-spec" id="spec-status-badge">Active</span>
+          </div>
+          <div class="spec-details">
+            <div class="spec-row">
+              <span class="spec-key">Current Path:</span>
+              <span class="spec-val" id="spec-current-path">/</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Directories:</span>
+              <span class="spec-val" id="spec-folder-count">0</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Files Count:</span>
+              <span class="spec-val" id="spec-file-count">0</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Total Size:</span>
+              <span class="spec-val" id="spec-total-size">0 B</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Chunk Unit:</span>
+              <span class="spec-val">8 MiB Block</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-key">Replication:</span>
+              <span class="spec-val text-success">3x Multi-Node</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-storage-info">
+          <div class="storage-title">
+            <span>Storage Pool</span>
+            <span id="storage-file-count" class="badge-count">0 files</span>
+          </div>
+          <div class="storage-progress-bar">
+            <div class="storage-progress-fill" id="storage-progress-fill" style="width: 5%;"></div>
+          </div>
+          <div class="storage-metrics">
+            <span id="storage-used-text">0 B stored</span>
+            <span class="storage-rep">AES-256</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <a href="http://localhost:8081/swagger-ui.html" target="_blank" class="footer-link" title="Open Metadata Swagger UI">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            <span>OpenAPI Spec</span>
+          </a>
+        </div>
+      </aside>
+
+      <!-- Main Workspace: Directory Hierarchy & Files Explorer -->
+      <main class="app-main">
+        <section id="view-files" class="content-view active">
+          <!-- Directory Path Header & Actions -->
+          <div class="content-toolbar">
+            <div class="breadcrumbs" id="breadcrumbs">
+              <span class="crumb active" data-folder="">/ (Root)</span>
+            </div>
+
+            <div class="toolbar-actions">
+              <button id="btn-new-folder" class="btn btn-secondary btn-sm" title="Create a new folder in this directory">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  <line x1="12" y1="11" x2="12" y2="17"></line>
+                  <line x1="9" y1="14" x2="15" y2="14"></line>
+                </svg>
+                <span>New Folder</span>
+              </button>
+
+              <button id="btn-rename-current-folder" class="btn btn-secondary btn-sm hidden" title="Rename current folder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+                <span>Rename</span>
+              </button>
+
+              <button id="btn-delete-current-folder" class="btn btn-secondary btn-sm text-danger hidden" title="Delete current folder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Delete</span>
+              </button>
+
+              <button id="btn-refresh" class="btn btn-icon" title="Refresh directory">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+              </button>
+
+              <div class="view-toggle">
+                <button id="btn-view-grid" class="btn btn-icon active" title="Grid View">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                  </svg>
+                </button>
+                <button id="btn-view-list" class="btn btn-icon" title="List View">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload Status Tray (Active Transfers) -->
+          <div id="upload-tray" class="upload-tray hidden">
+            <div class="upload-tray-header">
+              <span class="tray-title">Active Uploads & Chunk Distribution</span>
+              <button id="btn-minimize-tray" class="btn-text">&times;</button>
+            </div>
+            <div id="upload-tray-list" class="upload-tray-list"></div>
+          </div>
+
+          <!-- Directory Subfolders Section -->
+          <div id="folders-container" class="folders-container">
+            <div class="section-title-row">
+              <h3 class="section-heading">Subdirectories</h3>
+              <span class="section-badge" id="folders-count-badge">0 folders</span>
+            </div>
+            <div id="folders-grid" class="folders-grid">
+              <!-- Dynamically populated folder cards -->
+            </div>
+          </div>
+
+          <!-- Directory Files Section -->
+          <div class="files-wrapper">
+            <div class="files-header-row">
+              <div class="section-title-row">
+                <h3 class="section-heading" id="files-section-heading">Directory Files</h3>
+                <span class="section-badge" id="files-count-badge">0 files</span>
+              </div>
+              <span id="files-filter-status" class="filter-status-text"></span>
+            </div>
+
+            <!-- Loading State -->
+            <div id="files-loading" class="state-container hidden">
+              <div class="spinner"></div>
+              <p>Querying directory metadata...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="files-empty" class="state-container hidden">
+              <div class="empty-icon">
+                <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+              </div>
+              <h3>This directory is empty</h3>
+              <p>Drag and drop files here, create a subfolder, or click below to upload.</p>
+              <div class="empty-actions">
+                <button id="btn-empty-upload" class="btn btn-primary">Upload File Here</button>
+                <button id="btn-empty-new-folder" class="btn btn-secondary">New Subdirectory</button>
+              </div>
+            </div>
+
+            <!-- Files Grid / List -->
+            <div id="files-view" class="files-grid">
+              <!-- Dynamically populated files -->
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- CLUSTER HEALTH POPUP / DRAWER -->
+  <div id="cluster-drawer" class="modal-backdrop hidden">
+    <div class="modal-card cluster-modal-card">
+      <div class="modal-header">
+        <div class="cluster-drawer-title">
+          <div class="node-icon-header">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+              <line x1="6" y1="6" x2="6.01" y2="6"></line>
+              <line x1="6" y1="18" x2="6.01" y2="18"></line>
+            </svg>
+          </div>
+          <div>
+            <h3>Distributed Storage Cluster Nodes</h3>
+            <span class="preview-sub">3-Node Consistent Hash Ring Status</span>
+          </div>
+        </div>
+        <button id="btn-close-cluster-drawer" class="btn-icon">&times;</button>
+      </div>
+      <div class="modal-body cluster-drawer-body">
+        <div class="drawer-nodes-grid">
+          <div class="drawer-node-item">
+            <div class="dni-top">
+              <strong>Storage Node 1</strong>
+              <span class="status-pill status-up" id="dn-node1-status">UP</span>
+            </div>
+            <div class="dni-meta">Port 9001 • Primary Target • Volume storage1</div>
+          </div>
+          <div class="drawer-node-item">
+            <div class="dni-top">
+              <strong>Storage Node 2</strong>
+              <span class="status-pill status-up" id="dn-node2-status">UP</span>
+            </div>
+            <div class="dni-meta">Port 9002 • Peer Replica 1 • Volume storage2</div>
+          </div>
+          <div class="drawer-node-item">
+            <div class="dni-top">
+              <strong>Storage Node 3</strong>
+              <span class="status-pill status-up" id="dn-node3-status">UP</span>
+            </div>
+            <div class="dni-meta">Port 9003 • Peer Replica 2 • Volume storage3</div>
+          </div>
+        </div>
+
+        <div class="drawer-spec-banner">
+          <h4>Replication Specification:</h4>
+          <p>Every chunk uploaded to any directory is automatically sharded into 8 MiB blocks, encrypted via AES-256-GCM, hashed with SHA-256, and replicated across all 3 nodes to guarantee zero data loss on node failure.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTH MODAL (Login / Register) -->
+  <div id="auth-modal" class="modal-backdrop hidden">
+    <div class="modal-card auth-card">
+      <div class="auth-header">
+        <div class="auth-logo">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="url(#modal-logo-grad)" stroke-width="2.2">
+            <defs>
+              <linearGradient id="modal-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="100%" stop-color="#06b6d4" />
+              </linearGradient>
+            </defs>
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <h2>Sign In to NexusDrive</h2>
+        <p>Access your distributed directory vault</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login">Login</button>
+        <button class="auth-tab" id="tab-register">Register</button>
+      </div>
+
+      <div class="demo-login-box">
+        <button id="btn-quick-demo" class="btn btn-demo-quick">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+          </svg>
+          <span>One-Click Demo Account Login</span>
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="form-login" class="auth-form">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" required placeholder="Enter username" />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" required placeholder="Enter password" />
+        </div>
+        <div id="login-error" class="form-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-submit-login">
+          <span>Sign In</span>
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" class="auth-form hidden">
+        <div class="form-group">
+          <label for="reg-username">Username</label>
+          <input type="text" id="reg-username" required placeholder="Choose a username" />
+        </div>
+        <div class="form-group">
+          <label for="reg-email">Email</label>
+          <input type="email" id="reg-email" required placeholder="name@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <input type="password" id="reg-password" required placeholder="Minimum 8 characters" minlength="8" />
+        </div>
+        <div id="reg-error" class="form-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="btn-submit-register">
+          <span>Create Account</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- FILE PREVIEW MODAL -->
+  <div id="preview-modal" class="modal-backdrop hidden">
+    <div class="modal-card preview-card">
+      <div class="modal-header">
+        <div class="preview-title-area">
+          <span class="preview-file-icon" id="preview-file-icon">📄</span>
+          <div>
+            <h3 id="preview-filename">filename.ext</h3>
+            <span id="preview-file-size" class="preview-sub">0 KB</span>
+          </div>
+        </div>
+        <div class="modal-header-actions">
+          <button id="btn-preview-download" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download</span>
+          </button>
+          <button id="btn-close-preview" class="btn-icon">&times;</button>
+        </div>
+      </div>
+      <div class="preview-body" id="preview-body">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHUNK REPLICATION INSPECTOR MODAL -->
+  <div id="chunks-modal" class="modal-backdrop hidden">
+    <div class="modal-card chunks-card">
+      <div class="modal-header">
+        <div>
+          <h3>Chunk Sharding & Replication Inspector</h3>
+          <p id="chunks-modal-filename" class="preview-sub">file.pdf</p>
+        </div>
+        <button id="btn-close-chunks" class="btn-icon">&times;</button>
+      </div>
+      <div class="chunks-modal-body">
+        <div class="chunk-summary-stats">
+          <div class="stat-box">
+            <span class="stat-num" id="stat-expected-chunks">0</span>
+            <span class="stat-label">Total 8 MiB Chunks</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num text-success" id="stat-uploaded-chunks">0</span>
+            <span class="stat-label">Verified Online</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num" id="stat-rep-factor">3x</span>
+            <span class="stat-label">Replicas / Chunk</span>
+          </div>
+        </div>
+
+        <h4>Consistent Hash Node Map</h4>
+        <div id="chunks-grid-list" class="chunks-grid-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW FOLDER MODAL -->
+  <div id="folder-modal" class="modal-backdrop hidden">
+    <div class="modal-card small-card">
+      <div class="modal-header">
+        <h3 id="folder-modal-title">Create New Directory</h3>
+        <button id="btn-close-folder-modal" class="btn-icon">&times;</button>
+      </div>
+      <form id="form-create-folder" class="modal-body">
+        <div class="form-group">
+          <label for="folder-name-input">Folder Name</label>
+          <input type="text" id="folder-name-input" required placeholder="e.g. Documents, Production, Backups" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btn-cancel-folder" class="btn btn-secondary">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-folder-submit">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CONFIRM DELETE MODAL -->
+  <div id="delete-modal" class="modal-backdrop hidden">
+    <div class="modal-card small-card">
+      <div class="modal-header">
+        <h3 id="delete-modal-title">Confirm Deletion</h3>
+        <button id="btn-close-delete-modal" class="btn-icon">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong id="delete-item-name">this item</strong>?</p>
+        <p class="text-muted text-sm">Metadata will be marked deleted and scheduled for asynchronous physical cleanup across all storage nodes.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-delete" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="btn-confirm-delete" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING TOAST CONTAINER -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

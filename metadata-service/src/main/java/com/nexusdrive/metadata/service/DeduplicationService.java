@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.service;import com.nexusdrive.metadata.entity.FileMetadata;import java.util.Optional;public interface DeduplicationService{Optional<FileMetadata> findDuplicate(String hash);void cloneChunks(FileMetadata source,FileMetadata target);}

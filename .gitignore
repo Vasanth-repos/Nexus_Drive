@@ -1,0 +1,23 @@
+# Environment variables and secrets
+.env
+!.env.example
+
+# Build targets
+**/target/
+target/
+
+# Node dependencies and build
+node_modules/
+**/node_modules/
+frontend/dist/
+
+# Logs and test artifacts
+*.log
+.e2e/
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1 @@
+package com.nexusdrive.auth.repository; import com.nexusdrive.auth.entity.User; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface UserRepository extends JpaRepository<User,UUID>{Optional<User> findByUsernameIgnoreCase(String v);boolean existsByUsernameIgnoreCaseOrEmailIgnoreCase(String u,String e);}

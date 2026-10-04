@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.repository;import com.nexusdrive.metadata.entity.FileVersion;import java.util.UUID;import org.springframework.data.jpa.repository.JpaRepository;public interface FileVersionRepository extends JpaRepository<FileVersion,UUID>{}

@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.dto;import jakarta.validation.constraints.*;import java.util.*;public record FileUploadRequest(@NotBlank String filename,@NotBlank String mimeType,@PositiveOrZero long sizeBytes,UUID folderId,List<String> tags,String contentHash){}

@@ -1,0 +1,1 @@
+package com.nexusdrive.metadata.repository;import com.nexusdrive.metadata.entity.Folder;import java.util.*;import org.springframework.data.jpa.repository.JpaRepository;public interface FolderRepository extends JpaRepository<Folder,UUID>{List<Folder> findByOwnerIdAndParentId(UUID o,UUID p);Optional<Folder> findByIdAndOwnerId(UUID id,UUID o);}

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS share_permissions(id UUID PRIMARY KEY,file_id UUID NOT NULL REFERENCES file_metadata(id) ON DELETE CASCADE,shared_with_user_id UUID REFERENCES users(id) ON DELETE CASCADE,visibility VARCHAR(20) NOT NULL,permission VARCHAR(20) NOT NULL);
